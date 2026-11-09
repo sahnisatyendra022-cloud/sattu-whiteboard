@@ -160,5 +160,72 @@
                 android:contentDescription="@string/cd_save"
                 android:src="@drawable/ic_save" />
         </LinearLayout>
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:fillViewport="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="4dp">
+
+                <Button
+                    android:id="@+id/btnSelect"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/tool_select" />
+
+                <Button
+                    android:id="@+id/btnAreaErase"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/tool_area_erase" />
+
+                <Button
+                    android:id="@+id/btnShape"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/tool_shape" />
+
+                <Button
+                    android:id="@+id/btnFill"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/tool_fill" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="28dp"
+                    android:layout_marginHorizontal="4dp"
+                    android:background="@color/divider" />
+
+                <Button
+                    android:id="@+id/btnPrevSlide"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/slide_previous" />
+
+                <TextView
+                    android:id="@+id/tvSlide"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:minWidth="64dp"
+                    android:paddingHorizontal="6dp"
+                    android:text="@string/slide_initial"
+                    android:textColor="@color/pen_black"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/btnNextSlide"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/slide_next" />
+
+                <Button
+                    android:id="@+id/btnAddSlide"
+                    style="@style/CanvasActionButton"
+                    android:text="@string/slide_add" />
+            </LinearLayout>
+        </HorizontalScrollView>
     </LinearLayout>
 </LinearLayout>

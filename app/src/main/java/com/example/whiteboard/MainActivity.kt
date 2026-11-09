@@ -2,7 +2,6 @@ package com.example.whiteboard
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -56,6 +55,7 @@ class MainActivity : AppCompatActivity() {
         setupToolbar()
         refreshToolSelection()
         refreshHistoryButtons()
+        refreshSlideControls()
     }
 
     private fun setupToolbar() {
@@ -63,12 +63,14 @@ class MainActivity : AppCompatActivity() {
             view.setOnClickListener {
                 state.penColor = penColor
                 state.isEraser = false
+                binding.drawingView.setTool(DrawingTool.PEN)
                 refreshToolSelection()
             }
         }
 
         binding.btnEraser.setOnClickListener {
             state.isEraser = !state.isEraser
+            binding.drawingView.setTool(DrawingTool.PEN)
             refreshToolSelection()
         }
 
@@ -80,11 +82,97 @@ class MainActivity : AppCompatActivity() {
         binding.btnRedo.setOnClickListener { binding.drawingView.redo() }
         binding.btnClear.setOnClickListener { confirmClear() }
         binding.btnSave.setOnClickListener { saveDrawing() }
+        binding.btnSelect.setOnClickListener { chooseRegionTool(DrawingTool.SELECT) }
+        binding.btnAreaErase.setOnClickListener { chooseRegionTool(DrawingTool.AREA_ERASER) }
+        binding.btnShape.setOnClickListener { chooseShape() }
+        binding.btnFill.setOnClickListener {
+            state.fillShapes = !state.fillShapes
+            refreshToolSelection()
+        }
+        binding.btnPrevSlide.setOnClickListener { showSlide(viewModel.currentSlide - 1) }
+        binding.btnNextSlide.setOnClickListener { showSlide(viewModel.currentSlide + 1) }
+        binding.btnAddSlide.setOnClickListener {
+            binding.drawingView.attachState(viewModel.addSlide())
+            refreshSlideControls()
+            refreshToolSelection()
+        }
     }
 
     private fun setBrushSize(sizeDp: Float) {
         state.brushSizeDp = sizeDp
+        binding.drawingView.setTool(DrawingTool.PEN)
         refreshToolSelection()
+    }
+
+    private fun chooseShape() {
+        val labels = arrayOf(
+            getString(R.string.shape_rectangle),
+            getString(R.string.shape_rounded_rectangle),
+            getString(R.string.shape_oval),
+            getString(R.string.shape_triangle),
+            getString(R.string.shape_diamond),
+            getString(R.string.shape_pentagon),
+            getString(R.string.shape_hexagon),
+            getString(R.string.shape_star),
+            getString(R.string.shape_arrow),
+            getString(R.string.shape_line)
+        )
+        val shapes = arrayOf(
+            ShapeType.RECTANGLE,
+            ShapeType.ROUNDED_RECTANGLE,
+            ShapeType.OVAL,
+            ShapeType.TRIANGLE,
+            ShapeType.DIAMOND,
+            ShapeType.PENTAGON,
+            ShapeType.HEXAGON,
+            ShapeType.STAR,
+            ShapeType.ARROW,
+            ShapeType.LINE
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.choose_shape)
+            .setItems(labels) { _, index ->
+                binding.drawingView.setShapeType(shapes[index])
+                state.isEraser = false
+                refreshToolSelection()
+            }
+            .show()
+    }
+
+    private fun chooseRegionTool(tool: DrawingTool) {
+        val labels = arrayOf(
+            getString(R.string.region_rectangle),
+            getString(R.string.region_oval),
+            getString(R.string.region_lasso)
+        )
+        val regions = arrayOf(RegionType.RECTANGLE, RegionType.OVAL, RegionType.LASSO)
+        AlertDialog.Builder(this)
+            .setTitle(if (tool == DrawingTool.SELECT) R.string.select_area else R.string.erase_area)
+            .setItems(labels) { _, index ->
+                binding.drawingView.setRegionType(regions[index])
+                binding.drawingView.setTool(tool)
+                state.isEraser = false
+                refreshToolSelection()
+                if (tool == DrawingTool.SELECT) toast(R.string.select_help)
+            }
+            .show()
+    }
+
+    private fun showSlide(index: Int) {
+        if (index !in viewModel.slides.indices) return
+        binding.drawingView.attachState(viewModel.changeSlide(index))
+        refreshSlideControls()
+        refreshToolSelection()
+    }
+
+    private fun refreshSlideControls() {
+        binding.tvSlide.text = getString(
+            R.string.slide_counter,
+            viewModel.currentSlide + 1,
+            viewModel.slides.size
+        )
+        binding.btnPrevSlide.isEnabled = viewModel.currentSlide > 0
+        binding.btnNextSlide.isEnabled = viewModel.currentSlide < viewModel.slides.lastIndex
     }
 
     private fun refreshToolSelection() {
@@ -95,6 +183,11 @@ class MainActivity : AppCompatActivity() {
         binding.btnThin.isSelected = state.brushSizeDp == DrawingState.SIZE_THIN
         binding.btnMedium.isSelected = state.brushSizeDp == DrawingState.SIZE_MEDIUM
         binding.btnThick.isSelected = state.brushSizeDp == DrawingState.SIZE_THICK
+        binding.btnFill.isSelected = state.fillShapes
+        binding.btnSelect.isSelected = binding.drawingView.tool == DrawingTool.SELECT
+        binding.btnAreaErase.isSelected = binding.drawingView.tool == DrawingTool.AREA_ERASER
+        binding.btnShape.isSelected = binding.drawingView.tool == DrawingTool.SHAPE
+        binding.btnShape.text = getString(R.string.tool_shape)
     }
 
     private fun refreshHistoryButtons() {

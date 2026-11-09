@@ -6,8 +6,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
+import android.graphics.Region
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -34,6 +37,19 @@ class DrawingView @JvmOverloads constructor(
     private var cacheBitmap: Bitmap? = null
     private var cacheCanvas: Canvas? = null
     private var currentStroke: CustomPath? = null
+    private var regionGesture: Path? = null
+    private val selectedStrokes = ArrayList<CustomPath>()
+    private var movingSelection = false
+    private var moveStartX = 0f
+    private var moveStartY = 0f
+    private var lastMoveX = 0f
+    private var lastMoveY = 0f
+    var tool: DrawingTool = DrawingTool.PEN
+        private set
+    var shapeType: ShapeType = ShapeType.RECTANGLE
+        private set
+    var regionType: RegionType = RegionType.RECTANGLE
+        private set
 
     private val density = resources.displayMetrics.density
     private val touchTolerance = 2f * density
@@ -45,11 +61,17 @@ class DrawingView @JvmOverloads constructor(
         isDither = true
     }
     private val clearXfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+    private val regionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(33, 150, 243)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
+        pathEffect = android.graphics.DashPathEffect(floatArrayOf(8f * density, 5f * density), 0f)
+    }
 
     /** Called whenever undo/redo availability may have changed. */
     var onHistoryChanged: (() -> Unit)? = null
 
-    val canUndo: Boolean get() = state.history.isNotEmpty()
+    val canUndo: Boolean get() = state.undoStack.isNotEmpty()
     val canRedo: Boolean get() = state.redoStack.isNotEmpty()
     val isEmpty: Boolean get() = state.history.isEmpty()
 
@@ -64,6 +86,8 @@ class DrawingView @JvmOverloads constructor(
     fun attachState(newState: DrawingState) {
         state = newState
         currentStroke = null
+        selectedStrokes.clear()
+        regionGesture = null
         if (width > 0 && height > 0) fitStrokesToSize(width, height)
         rebuildCache()
         invalidate()
@@ -71,8 +95,13 @@ class DrawingView @JvmOverloads constructor(
     }
 
     fun undo() {
-        if (state.history.isEmpty()) return
-        state.redoStack.add(state.history.removeAt(state.history.lastIndex))
+        if (state.undoStack.isEmpty()) return
+        when (val action = state.undoStack.removeAt(state.undoStack.lastIndex)) {
+            is CanvasAction.StrokeAdded -> state.history.remove(action.stroke)
+            is CanvasAction.StrokesMoved -> transformStrokes(action.strokes, -action.dx, -action.dy)
+        }
+        state.redoStack.add(action)
+        selectedStrokes.clear()
         rebuildCache()
         invalidate()
         onHistoryChanged?.invoke()
@@ -80,9 +109,14 @@ class DrawingView @JvmOverloads constructor(
 
     fun redo() {
         if (state.redoStack.isEmpty()) return
-        val stroke = state.redoStack.removeAt(state.redoStack.lastIndex)
-        state.history.add(stroke)
-        cacheCanvas?.let { drawStroke(it, stroke) }
+        val action = state.redoStack.removeAt(state.redoStack.lastIndex)
+        when (action) {
+            is CanvasAction.StrokeAdded -> state.history.add(action.stroke)
+            is CanvasAction.StrokesMoved -> transformStrokes(action.strokes, action.dx, action.dy)
+        }
+        state.undoStack.add(action)
+        selectedStrokes.clear()
+        rebuildCache()
         invalidate()
         onHistoryChanged?.invoke()
     }
@@ -90,10 +124,31 @@ class DrawingView @JvmOverloads constructor(
     fun clearCanvas() {
         if (state.history.isEmpty() && state.redoStack.isEmpty()) return
         state.history.clear()
+        state.undoStack.clear()
         state.redoStack.clear()
+        selectedStrokes.clear()
         rebuildCache()
         invalidate()
         onHistoryChanged?.invoke()
+    }
+
+    fun setTool(newTool: DrawingTool) {
+        tool = newTool
+        currentStroke = null
+        regionGesture = null
+        if (newTool != DrawingTool.SELECT) selectedStrokes.clear()
+        invalidate()
+    }
+
+    fun setShapeType(type: ShapeType) {
+        shapeType = type
+        tool = DrawingTool.SHAPE
+        invalidate()
+    }
+
+    fun setRegionType(type: RegionType) {
+        regionType = type
+        invalidate()
     }
 
     /** Returns a new opaque bitmap (white background + drawing) or null if not laid out yet. */
@@ -169,7 +224,7 @@ class DrawingView @JvmOverloads constructor(
         when {
             stroke == null -> canvas.drawBitmap(bmp, 0f, 0f, null)
 
-            stroke.isEraser -> {
+            stroke != null && stroke.isEraser -> {
                 // CLEAR only works inside an off-screen layer, otherwise it would punch
                 // through to the window background instead of just removing ink.
                 val saved = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
@@ -177,16 +232,20 @@ class DrawingView @JvmOverloads constructor(
                 drawStroke(canvas, stroke)
                 canvas.restoreToCount(saved)
             }
-
             else -> {
                 canvas.drawBitmap(bmp, 0f, 0f, null)
-                drawStroke(canvas, stroke)
+                stroke?.let { drawStroke(canvas, it) }
             }
         }
+        selectedStrokes.forEach { selected ->
+            canvas.drawRect(strokeBounds(selected), regionPaint)
+        }
+        regionGesture?.let { canvas.drawPath(it, regionPaint) }
     }
 
     private fun drawStroke(canvas: Canvas, stroke: CustomPath) {
         strokePaint.strokeWidth = stroke.strokeWidth
+        strokePaint.style = if (stroke.isFilled) Paint.Style.FILL else Paint.Style.STROKE
         if (stroke.isEraser) {
             strokePaint.xfermode = clearXfermode
             strokePaint.color = Color.TRANSPARENT
@@ -212,26 +271,59 @@ class DrawingView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
-                startStroke(event.x, event.y)
+                when (tool) {
+                    DrawingTool.PEN, DrawingTool.SHAPE -> startStroke(event.x, event.y)
+                    DrawingTool.AREA_ERASER -> startRegion(event.x, event.y)
+                    DrawingTool.SELECT -> {
+                        if (selectedStrokes.isNotEmpty() && selectedStrokes.any {
+                                strokeBounds(it).contains(event.x, event.y)
+                            }
+                        ) {
+                            movingSelection = true
+                            moveStartX = event.x
+                            moveStartY = event.y
+                            lastMoveX = event.x
+                            lastMoveY = event.y
+                        } else {
+                            startRegion(event.x, event.y)
+                        }
+                    }
+                }
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (currentStroke == null) return true
-                // Historical points give much smoother curves on fast finger/stylus movement.
-                for (i in 0 until event.historySize) {
-                    addPoint(event.getHistoricalX(i), event.getHistoricalY(i))
+                if (movingSelection) {
+                    moveSelected(event.x, event.y)
+                } else if (regionGesture != null) {
+                    updateRegion(event.x, event.y)
+                } else if (currentStroke != null) {
+                    // Historical points give much smoother curves on fast finger/stylus movement.
+                    for (i in 0 until event.historySize) {
+                        addPoint(event.getHistoricalX(i), event.getHistoricalY(i))
+                    }
+                    addPoint(event.x, event.y)
                 }
-                addPoint(event.x, event.y)
                 invalidate()
             }
 
             MotionEvent.ACTION_UP -> {
-                addPoint(event.x, event.y)
-                finishStroke()
+                when {
+                    movingSelection -> finishSelectionMove()
+                    regionGesture != null -> finishRegion(event.x, event.y)
+                    currentStroke != null -> {
+                        addPoint(event.x, event.y)
+                        finishStroke()
+                    }
+                }
                 performClick()
             }
 
-            MotionEvent.ACTION_CANCEL -> finishStroke()
+            MotionEvent.ACTION_CANCEL -> {
+                if (currentStroke != null) finishStroke()
+                regionGesture = null
+                if (movingSelection) finishSelectionMove()
+                invalidate()
+            }
         }
         return true
     }
@@ -244,12 +336,143 @@ class DrawingView @JvmOverloads constructor(
     private fun startStroke(x: Float, y: Float) {
         val eraser = state.isEraser
         val widthPx = state.brushSizeDp * density * (if (eraser) ERASER_SCALE else 1f)
-        currentStroke = CustomPath(state.penColor, widthPx, eraser).also { it.begin(x, y) }
+        val shape = if (tool == DrawingTool.SHAPE) shapeType else ShapeType.FREEHAND
+        currentStroke = CustomPath(
+            state.penColor,
+            widthPx,
+            eraser,
+            shape,
+            isFilled = tool == DrawingTool.SHAPE && state.fillShapes && shape != ShapeType.LINE
+        ).also {
+            it.begin(x, y)
+            if (shape != ShapeType.FREEHAND) it.updateShape(x, y)
+        }
         invalidate()
+    }
+
+    private fun startRegion(x: Float, y: Float) {
+        selectedStrokes.clear()
+        regionGesture = Path().apply {
+            if (regionType == RegionType.LASSO) moveTo(x, y)
+            else updateRegionPath(this, x, y, x, y)
+        }
+        lastMoveX = x
+        lastMoveY = y
+        invalidate()
+    }
+
+    private fun updateRegion(x: Float, y: Float) {
+        val path = regionGesture ?: return
+        if (regionType == RegionType.LASSO) {
+            path.lineTo(x, y)
+        } else {
+            updateRegionPath(path, lastMoveX, lastMoveY, x, y)
+        }
+    }
+
+    private fun updateRegionPath(path: Path, x1: Float, y1: Float, x2: Float, y2: Float) {
+        val left = minOf(x1, x2)
+        val right = maxOf(x1, x2)
+        val top = minOf(y1, y2)
+        val bottom = maxOf(y1, y2)
+        path.reset()
+        if (regionType == RegionType.OVAL) path.addOval(left, top, right, bottom, Path.Direction.CW)
+        else path.addRect(left, top, right, bottom, Path.Direction.CW)
+    }
+
+    private fun finishRegion(x: Float, y: Float) {
+        updateRegion(x, y)
+        val region = regionGesture
+        regionGesture = null
+        if (region != null) {
+            if (regionType == RegionType.LASSO) region.close()
+            if (tool == DrawingTool.AREA_ERASER) {
+                val bounds = RectF()
+                region.computeBounds(bounds, true)
+                if (bounds.width() > 1f && bounds.height() > 1f) {
+                    val eraser = CustomPath(Color.TRANSPARENT, 1f, true, isFilled = true)
+                    eraser.path.set(region)
+                    state.history.add(eraser)
+                    state.undoStack.add(CanvasAction.StrokeAdded(eraser))
+                    state.redoStack.clear()
+                }
+                selectedStrokes.clear()
+            } else {
+                selectedStrokes.addAll(state.history.filter { pathIntersectsRegion(it, region) })
+            }
+        }
+        rebuildCache()
+        invalidate()
+        onHistoryChanged?.invoke()
+    }
+
+    private fun moveSelected(x: Float, y: Float) {
+        val dx = x - lastMoveX
+        val dy = y - lastMoveY
+        if (dx == 0f && dy == 0f) return
+        val matrix = Matrix().apply { setTranslate(dx, dy) }
+        selectedStrokes.forEach { it.path.transform(matrix) }
+        lastMoveX = x
+        lastMoveY = y
+        rebuildCache()
+    }
+
+    private fun finishSelectionMove() {
+        movingSelection = false
+        val dx = lastMoveX - moveStartX
+        val dy = lastMoveY - moveStartY
+        if (dx != 0f || dy != 0f) {
+            state.undoStack.add(CanvasAction.StrokesMoved(selectedStrokes.toList(), dx, dy))
+            state.redoStack.clear()
+            onHistoryChanged?.invoke()
+        }
+    }
+
+    private fun transformStrokes(strokes: List<CustomPath>, dx: Float, dy: Float) {
+        val matrix = Matrix().apply { setTranslate(dx, dy) }
+        strokes.forEach { it.path.transform(matrix) }
+    }
+
+    private fun strokeBounds(stroke: CustomPath): RectF =
+        RectF().also {
+            stroke.path.computeBounds(it, true)
+            val padding = stroke.strokeWidth / 2f
+            it.inset(-padding, -padding)
+        }
+
+    private fun pathIntersectsRegion(stroke: CustomPath, selection: Path): Boolean {
+        val selectionBounds = RectF()
+        selection.computeBounds(selectionBounds, true)
+        if (!strokeBounds(stroke).intersect(selectionBounds)) return false
+
+        val clipBounds = Region(
+            selectionBounds.left.toInt(),
+            selectionBounds.top.toInt(),
+            selectionBounds.right.toInt() + 1,
+            selectionBounds.bottom.toInt() + 1
+        )
+        val selectionRegion = Region()
+        selectionRegion.setPath(selection, clipBounds)
+
+        val outline = Path()
+        val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = if (stroke.isFilled) Paint.Style.FILL else Paint.Style.STROKE
+            strokeWidth = stroke.strokeWidth
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        outlinePaint.getFillPath(stroke.path, outline)
+        val strokeRegion = Region()
+        strokeRegion.setPath(outline, clipBounds)
+        return strokeRegion.op(selectionRegion, Region.Op.INTERSECT) && !strokeRegion.isEmpty
     }
 
     private fun addPoint(x: Float, y: Float) {
         val stroke = currentStroke ?: return
+        if (stroke.shape != ShapeType.FREEHAND) {
+            stroke.updateShape(x, y)
+            return
+        }
         if (abs(x - stroke.lastX) >= touchTolerance || abs(y - stroke.lastY) >= touchTolerance) {
             stroke.extend(x, y)
         }
@@ -260,6 +483,7 @@ class DrawingView @JvmOverloads constructor(
         currentStroke = null
         stroke.finish()
         state.history.add(stroke)
+        state.undoStack.add(CanvasAction.StrokeAdded(stroke))
         state.redoStack.clear() // a new action invalidates the redo history
         cacheCanvas?.let { drawStroke(it, stroke) }
         invalidate()
