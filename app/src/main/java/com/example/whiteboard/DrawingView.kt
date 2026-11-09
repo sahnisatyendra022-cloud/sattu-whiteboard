@@ -96,7 +96,8 @@ class DrawingView @JvmOverloads constructor(
 
     fun undo() {
         if (state.undoStack.isEmpty()) return
-        when (val action = state.undoStack.removeAt(state.undoStack.lastIndex)) {
+        val action = state.undoStack.removeAt(state.undoStack.lastIndex)
+        when (action) {
             is CanvasAction.StrokeAdded -> state.history.remove(action.stroke)
             is CanvasAction.StrokesMoved -> transformStrokes(action.strokes, -action.dx, -action.dy)
         }
