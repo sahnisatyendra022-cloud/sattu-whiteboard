@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Whiteboard" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/pen_blue</item>
+        <item name="colorPrimaryDark">@color/canvas_white</item>
+        <item name="colorAccent">@color/pen_blue</item>
+        <item name="android:statusBarColor">@color/canvas_white</item>
+        <item name="android:navigationBarColor">@color/toolbar_bg</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">@color/canvas_white</item>
+    </style>
+
+    <!-- Equal-width toolbar button; weight spreads items across any screen width. -->
+    <style name="ToolButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_margin">2dp</item>
+        <item name="android:background">@drawable/bg_tool</item>
+        <item name="android:scaleType">center</item>
+    </style>
+</resources>

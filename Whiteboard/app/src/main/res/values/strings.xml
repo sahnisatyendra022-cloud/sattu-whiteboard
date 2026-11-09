@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Whiteboard</string>
+
+    <string name="cd_canvas">Drawing canvas</string>
+    <string name="cd_color_black">Black</string>
+    <string name="cd_color_red">Red</string>
+    <string name="cd_color_blue">Blue</string>
+    <string name="cd_color_green">Green</string>
+    <string name="cd_eraser">Eraser</string>
+    <string name="cd_size_thin">Thin brush</string>
+    <string name="cd_size_medium">Medium brush</string>
+    <string name="cd_size_thick">Thick brush</string>
+    <string name="cd_undo">Undo</string>
+    <string name="cd_redo">Redo</string>
+    <string name="cd_clear">Clear all</string>
+    <string name="cd_save">Save to gallery</string>
+
+    <string name="clear_title">Clear canvas?</string>
+    <string name="clear_message">This removes everything on the whiteboard and cannot be undone.</string>
+    <string name="clear_confirm">Clear</string>
+
+    <string name="saved">Saved to Pictures/Whiteboard</string>
+    <string name="save_failed">Could not save the image</string>
+    <string name="nothing_to_save">Nothing to save yet</string>
+    <string name="permission_denied">Storage permission is needed to save images</string>
+</resources>

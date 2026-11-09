@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/canvas_white"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <com.example.whiteboard.DrawingView
+        android:id="@+id/drawingView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/cd_canvas" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/toolbar_bg"
+        android:elevation="8dp"
+        android:orientation="vertical"
+        android:paddingVertical="4dp">
+
+        <!-- Row 1: colors | eraser | brush sizes -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="4dp">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+                <View
+                    android:id="@+id/swatchBlack"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_swatch"
+                    android:backgroundTint="@color/pen_black"
+                    android:contentDescription="@string/cd_color_black"
+                    android:focusable="true"
+                    android:clickable="true" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+                <View
+                    android:id="@+id/swatchRed"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_swatch"
+                    android:backgroundTint="@color/pen_red"
+                    android:contentDescription="@string/cd_color_red"
+                    android:focusable="true"
+                    android:clickable="true" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+                <View
+                    android:id="@+id/swatchBlue"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_swatch"
+                    android:backgroundTint="@color/pen_blue"
+                    android:contentDescription="@string/cd_color_blue"
+                    android:focusable="true"
+                    android:clickable="true" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+                <View
+                    android:id="@+id/swatchGreen"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_swatch"
+                    android:backgroundTint="@color/pen_green"
+                    android:contentDescription="@string/cd_color_green"
+                    android:focusable="true"
+                    android:clickable="true" />
+            </FrameLayout>
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center_vertical"
+                android:background="@color/divider" />
+
+            <ImageButton
+                android:id="@+id/btnEraser"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_eraser"
+                android:src="@drawable/ic_eraser" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center_vertical"
+                android:background="@color/divider" />
+
+            <ImageButton
+                android:id="@+id/btnThin"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_size_thin"
+                android:src="@drawable/ic_brush_thin" />
+
+            <ImageButton
+                android:id="@+id/btnMedium"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_size_medium"
+                android:src="@drawable/ic_brush_medium" />
+
+            <ImageButton
+                android:id="@+id/btnThick"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_size_thick"
+                android:src="@drawable/ic_brush_thick" />
+        </LinearLayout>
+
+        <!-- Row 2: history + file actions -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="4dp">
+
+            <ImageButton
+                android:id="@+id/btnUndo"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_undo"
+                android:src="@drawable/ic_undo" />
+
+            <ImageButton
+                android:id="@+id/btnRedo"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_redo"
+                android:src="@drawable/ic_redo" />
+
+            <ImageButton
+                android:id="@+id/btnClear"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_clear"
+                android:src="@drawable/ic_delete" />
+
+            <ImageButton
+                android:id="@+id/btnSave"
+                style="@style/ToolButton"
+                android:contentDescription="@string/cd_save"
+                android:src="@drawable/ic_save" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
